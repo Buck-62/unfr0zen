@@ -12,17 +12,18 @@ static int custom_activity(enum custom_page page) {
 static inline int custom_matter(enum custom_page page) {
     return page == CUSTOM_MATTER || page == CUSTOM_MATTER_PAIRING || page == CUSTOM_MATTER_CONFIRM;
 }
-/* Canonical home actions: Matter=0, Zigbee=1, Done=2, Doom=3, shown as
- * Matter, Zigbee, Doom, Done. Compact the visible list without ever
+/* Canonical home actions: Matter=0, Zigbee=1, Done=2, Doom=3, Photo=4, shown as
+ * Matter, Zigbee, Doom, Photo, Done. Compact the visible list without ever
  * interpreting Zigbee-only index 0 as Matter. */
 static inline int custom_home_count(unsigned int features) {
-    return 1 + !!(features & 1) + !!(features & 2) + !!(features & 4);
+    return 1 + !!(features & 1) + !!(features & 2) + !!(features & 4) + !!(features & 8);
 }
 static inline int custom_home_action(int choice, unsigned int features) {
     int index = 0;
     if ((features & 1) && choice == index++) return 0;
     if ((features & 2) && choice == index++) return 1;
     if ((features & 4) && choice == index++) return 3;
+    if ((features & 8) && choice == index++) return 4;
     return choice == index ? 2 : -1;
 }
 static int custom_back(struct custom_flow *flow) {
@@ -68,12 +69,16 @@ static inline int custom_matter_refresh(struct custom_flow *flow, const char *st
     }
     return 0;
 }
-/* Requests: Matter's pairing=0, Zigbee's=1, Doom's launch=2. */
+/* Requests: Matter's pairing=0, Zigbee's=1, Doom's launch=2, Photo's launch=3. */
 static int custom_choose(struct custom_flow *flow, int choice, int (*request)(int)) {
-    if (choice < 0 || choice > 3) return 1;
+    if (choice < 0 || choice > 4) return 1;
     flow->action_failed = 0;
     if (flow->page == CUSTOM_HOME) {
         if (choice == 2) return 2;
+        if (choice == 4) {
+            flow->action_failed = request(3) != 0;
+            return 1;
+        }
         if (choice == 3) {
             flow->page = CUSTOM_DOOM;
             return 1;

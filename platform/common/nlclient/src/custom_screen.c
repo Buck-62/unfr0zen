@@ -145,9 +145,9 @@ struct custom_state {
     void *menu_glyph;
     text_config config;
     nl_string text[3];
-    nl_string choices[4];
+    nl_string choices[5];
     u32 flags[3];
-    const char *choice_ids[5];
+    const char *choice_ids[6];
     u8 layer_vtables[VTABLE_MAX];
     u8 screen_vtables[VTABLE_MAX];
 };
@@ -443,18 +443,20 @@ int custom_schedule_commit(void *bucket) {
     downlink_activity(bucket);
     return result;
 }
-/* 0: Matter's pairing, 1: Zigbee's, 2: Doom's launch. */
+/* 0: Matter's pairing, 1: Zigbee's, 2: Doom's launch, 3: Photo's launch. */
 static int request_action(int which) {
     char status[96];
-    read_text(which == 2 ? "/var/run/unfr0zen/doom.status" : which ? "/var/run/unfr0zen/zigbee.status" :
+    read_text(which >= 2 ? "/var/run/unfr0zen/doom.status" : which ? "/var/run/unfr0zen/zigbee.status" :
               "/var/run/unfr0zen/matter.status", status, sizeof(status), "Unavailable");
     /* Disabled/still-starting services cannot acknowledge a command. */
     if (same_text(status, "Unavailable") || same_text(status, "Matter not enabled") ||
         same_text(status, "Zigbee not enabled") || same_text(status, "Starting Matter...") ||
         same_text(status, "Starting Zigbee...") || same_text(status, "Radio unavailable. Try again.")) return -1;
-    const char *tmp = which == 2 ? "/var/run/unfr0zen/doom.request.tmp" : which ? "/var/run/unfr0zen/zigbee.request.tmp" :
+    const char *tmp = which == 3 ? "/var/run/unfr0zen/photo.request.tmp" :
+                      which == 2 ? "/var/run/unfr0zen/doom.request.tmp" : which ? "/var/run/unfr0zen/zigbee.request.tmp" :
                       "/var/run/unfr0zen/matter-reset.request.tmp";
-    const char *path = which == 2 ? "/var/run/unfr0zen/doom.request" : which ? "/var/run/unfr0zen/zigbee.request" :
+    const char *path = which == 3 ? "/var/run/unfr0zen/photo.request" :
+                       which == 2 ? "/var/run/unfr0zen/doom.request" : which ? "/var/run/unfr0zen/zigbee.request" :
                        "/var/run/unfr0zen/matter-reset.request";
     void *file = native_fopen(tmp, "w");
     if (!file) return -1;
@@ -531,7 +533,12 @@ static int option_word(const char *text, const char *option) {
 static unsigned int enabled_features(void) {
     char flags[8];
     read_text("/var/run/unfr0zen/features", flags, sizeof(flags), "");
-    if (flags[0] >= '0' && flags[0] <= '7' && !flags[1]) return flags[0] - '0';
+    if (flags[0] >= '0' && flags[0] <= '7' && !flags[1]) {
+        unsigned int features = flags[0] - '0';
+        void *photo = (features & 4) ? native_fopen("/media/data/nest-photo/photo.frame", "rb") : 0;
+        if (photo) { native_fclose(photo); features |= 8; }
+        return features;
+    }
     /* Before nestlocal starts, use the same options precedence as its init script.
      * No installed options means no protocol integrations. */
     char options[1024];
@@ -571,11 +578,11 @@ static void show(void *raw, int opening) {
     if (s->flow.page == CUSTOM_HOME) {
         char name[64];
         read_text("/etc/unfr0zen/version", name, sizeof(name), "unfr0zen");
-        native_string_copy(&s->text[1], name);
-        for (int i = 0; i < 4; i++) {
+        native_string_copy(&s->text[1], s->flow.action_failed ? "Photo is unavailable. Try again." : name);
+        for (int i = 0; i < 5; i++) {
             int action = custom_home_action(i, s->features);
             native_string_copy(&s->choices[i], action == 0 ? "Matter" : action == 1 ? "Zigbee" :
-                               action == 2 ? "Done" : action == 3 ? "Doom" : "");
+                               action == 2 ? "Done" : action == 3 ? "Doom" : action == 4 ? "Photo" : "");
         }
     } else if (doom) {
         native_string_copy(&s->text[1], s->flow.action_failed ? "Doom is unavailable. Try again." :
@@ -938,8 +945,9 @@ void *custom_factory(void *globals, void *handler, const char *name) {
     s->choice_ids[1] = "second";
     s->choice_ids[2] = "third";
     s->choice_ids[3] = "fourth";
+    s->choice_ids[4] = "fifth";
     for (int i = 0; i < 3; i++) native_string_ctor(&s->text[i]);
-    for (int i = 0; i < 4; i++) native_string_ctor(&s->choices[i]);
+    for (int i = 0; i < 5; i++) native_string_ctor(&s->choices[i]);
     /* Preserve negative-offset metadata and all adjustment thunks. */
     bytes_copy(s->layer_vtables, (u8 *)PTR(raw, 0) - 12, LAYER_VTABLE_SIZE);
     PTR(raw, 0) = s->layer_vtables + 12;

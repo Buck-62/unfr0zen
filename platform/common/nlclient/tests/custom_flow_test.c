@@ -58,6 +58,16 @@ int main(void) {
         assert(custom_home_action(-1, mask) == -1);
     }
     struct custom_flow f = {0};
+    for (unsigned int mask = 0; mask < 8; mask++) {
+        int done = custom_home_count(mask) - 1;
+        assert(custom_home_count(mask | 8) == done + 2);
+        for (int i = 0; i < done; i++)
+            assert(custom_home_action(i, mask | 8) == custom_home_action(i, mask));
+        assert(custom_home_action(done, mask | 8) == 4);
+        assert(custom_home_action(done + 1, mask | 8) == 2);
+    }
+    last = -1;
+    assert(custom_choose(&f, 4, request) == 1 && last == 3 && f.page == CUSTOM_HOME);
     assert(custom_choose(&f, 0, request) == 1 && f.page == CUSTOM_MATTER);
     last = -1;
     assert(custom_choose(&f, 0, request) == 1 && last == -1 && f.page == CUSTOM_MATTER_CONFIRM);

@@ -1,0 +1,62 @@
+name: Nest Photo installer
+
+on:
+  push:
+    branches: [codex/nest-photo]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install firmware build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config bc bison flex libssl-dev clang cmake ninja-build python3-venv python3-pil gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-dev
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/unfr0zen-tools"
+          "$RUNNER_TEMP/unfr0zen-tools/bin/pip" install ziglang==0.16.0 cargo-zigbuild==0.23.4
+          echo "$RUNNER_TEMP/unfr0zen-tools/bin" >> "$GITHUB_PATH"
+          rustup update stable
+          rustup default stable
+      - name: Test Photo and Doom navigation
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror platform/common/nlclient/tests/custom_flow_test.c -o "$RUNNER_TEMP/custom-flow-test"
+          "$RUNNER_TEMP/custom-flow-test"
+      - name: Build firmware
+        run: JOBS=4 sh utils/build-firmware.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unfr0zen-firmware
+          path: build/
+          if-no-files-found: error
+          retention-days: 1
+
+  installer:
+    needs: firmware
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: unfr0zen-firmware
+          path: build
+      - name: Build Windows installer
+        run: |
+          rustup update stable
+          rustup default stable
+          cargo build --locked --release -p unfr0zen-gui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unfr0zen-nest-photo-windows
+          path: target/release/unfr0zen.exe
+          if-no-files-found: error

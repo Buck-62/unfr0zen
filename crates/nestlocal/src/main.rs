@@ -10,6 +10,7 @@ mod cloud;
 mod commands;
 mod device;
 mod doom;
+mod photo;
 mod entropy;
 mod flags;
 mod heatlink;

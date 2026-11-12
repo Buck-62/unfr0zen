@@ -13,6 +13,13 @@ const LAUNCHER: &str = "/nestlabs/sbin/unfr0zen-doom";
 pub fn start() {
     let spawned = std::thread::Builder::new().name("doom".into()).spawn(|| loop {
         std::thread::sleep(Duration::from_millis(500));
+        if settings_ui::take_request("photo") {
+            if let Err(e) = crate::photo::show() {
+                logf!("photo: {e}");
+            }
+            settings_ui::take_request("photo");
+            continue;
+        }
         if !settings_ui::take_request("doom") {
             continue;
         }
