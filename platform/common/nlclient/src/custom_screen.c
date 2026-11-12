@@ -122,6 +122,7 @@ extern int native_enqueue(void *, const void *, void *);
 #define MENU_GLYPH "/nestlabs/share/images/G_unfr0zen_glyph_80px.png"
 /* Doom's title, made from the WAD when the app installs Doom (246x120). */
 #define DOOM_IMAGE "/nestlabs/share/images/G_unfr0zen_doom.png"
+#define MENU_NAME "/media/data/nest-photo/menu-name"
 struct custom_state {
     struct custom_flow flow;
     int active;
@@ -578,7 +579,9 @@ static void show(void *raw, int opening) {
     if (s->flow.page == CUSTOM_HOME) {
         char name[64];
         read_text("/etc/unfr0zen/version", name, sizeof(name), "unfr0zen");
-        native_string_copy(&s->text[1], s->flow.action_failed ? "Photo is unavailable. Try again." : name);
+        char label[25];
+        read_text(MENU_NAME, label, sizeof(label), "");
+        native_string_copy(&s->text[1], s->flow.action_failed ? "Photo is unavailable. Try again." : label[0] ? label : name);
         for (int i = 0; i < 5; i++) {
             int action = custom_home_action(i, s->features);
             native_string_copy(&s->choices[i], action == 0 ? "Matter" : action == 1 ? "Zigbee" :
@@ -818,7 +821,10 @@ static int draw_common(void *base, void *context) {
     return draw((u8 *)base - COMMON_OFFSET, context);
 }
 static void title(void *screen) {
-    native_string_copy((nl_string *)((u8 *)screen + 0x54), "\nUNFR0ZEN");
+    char label[26];
+    label[0] = '\n';
+    read_text(MENU_NAME, label + 1, sizeof(label) - 1, "");
+    native_string_copy((nl_string *)((u8 *)screen + 0x54), label[1] ? label : "\nUNFR0ZEN");
     native_string_copy((nl_string *)((u8 *)screen + 0x70), "");
     native_rebuild_title(screen);
 }
